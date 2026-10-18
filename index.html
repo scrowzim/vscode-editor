@@ -1,0 +1,366 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GLua Loader</title>
+<style>
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #101116;
+    color: #e0e2eb;
+    font: 13px Arial, sans-serif;
+}
+
+.app {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.header {
+    height: 46px;
+    flex-shrink: 0;
+    background: #171921;
+    border-bottom: 1px solid #2a2d39;
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 12px;
+}
+
+.logo {
+    color: #a497ff;
+    font-size: 21px;
+    font-weight: bold;
+}
+
+.title { font-weight: bold; }
+.version { color: #6f768a; font-size: 11px; }
+.spacer { flex: 1; }
+
+button {
+    font: inherit;
+    cursor: pointer;
+}
+
+.action {
+    border: 1px solid #383b4c;
+    color: #cdd0df;
+    background: #252833;
+    padding: 7px 12px;
+    border-radius: 6px;
+}
+
+.action:hover { background: #343849; }
+
+.primary {
+    background: #705ee8;
+    color: white;
+    border-color: #705ee8;
+}
+
+.primary:hover { background: #8474f3; }
+
+.tabbar {
+    height: 40px;
+    flex-shrink: 0;
+    background: #1b1d27;
+    display: flex;
+    border-bottom: 1px solid #303341;
+}
+
+.tabs {
+    display: flex;
+    flex: 1;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+    height: 40px;
+    min-width: 130px;
+    max-width: 210px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    background: #1b1d27;
+    border-right: 1px solid #303341;
+    color: #8990a3;
+    cursor: pointer;
+    user-select: none;
+}
+
+.tab:hover { background: #292c39; }
+
+.tab.active {
+    background: #101116;
+    color: white;
+    border-top: 2px solid #9786ff;
+}
+
+.tab-icon { color: #a394ff; }
+
+.tab-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.close {
+    background: transparent;
+    border: none;
+    color: #8b91a4;
+    font-size: 17px;
+    border-radius: 4px;
+}
+
+.close:hover {
+    color: white;
+    background: #b6485c;
+}
+
+.add {
+    border: none;
+    background: transparent;
+    color: #adb1c1;
+    font-size: 22px;
+    width: 45px;
+}
+
+.add:hover { background: #333645; }
+
+.editors {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    background: #101116;
+}
+
+.editor {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: none;
+}
+
+.editor.active { display: block; }
+
+.status {
+    height: 27px;
+    flex-shrink: 0;
+    background: #705ee8;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 0 12px;
+    font-size: 11px;
+    color: white;
+}
+
+.status-right { margin-left: auto; }
+</style>
+</head>
+<body>
+
+<div class="app">
+    <div class="header">
+        <span class="logo">λ</span>
+        <span class="title">GLua Loader</span>
+        <span class="version">MONACO v1.0</span>
+        <div class="spacer"></div>
+
+        <button class="action" onclick="renameTab()">
+            Rename
+        </button>
+
+        <button class="action primary" onclick="executeTab()">
+            ▶ Execute
+        </button>
+    </div>
+
+    <div class="tabbar">
+        <div class="tabs" id="tabs"></div>
+        <button class="add" onclick="createTab()" title="New tab">+</button>
+    </div>
+
+    <div class="editors" id="editors"></div>
+
+    <div class="status">
+        <span>● Ready</span>
+        <span id="filename">main.lua</span>
+        <span class="status-right">GLua / GMod Monaco</span>
+    </div>
+</div>
+
+<script>
+var MONACO_URL =
+    "https://metastruct.github.io/gmod-monaco/";
+
+var tabs = [];
+var activeId = null;
+var nextId = 0;
+
+function currentTab() {
+    for (var i = 0; i < tabs.length; i++) {
+        if (tabs[i].id === activeId) return tabs[i];
+    }
+    return null;
+}
+
+function createTab(name) {
+    var id = ++nextId;
+
+    var tab = {
+        id: id,
+        name: name || "script_" + id + ".lua"
+    };
+
+    tabs.push(tab);
+
+    var iframe = document.createElement("iframe");
+    iframe.id = "editor-" + id;
+    iframe.className = "editor";
+    iframe.src = MONACO_URL;
+    iframe.title = tab.name;
+
+    document.getElementById("editors").appendChild(iframe);
+
+    switchTab(id);
+}
+
+function switchTab(id) {
+    activeId = id;
+
+    var frames = document.querySelectorAll(".editor");
+
+    for (var i = 0; i < frames.length; i++) {
+        frames[i].classList.remove("active");
+    }
+
+    var frame = document.getElementById("editor-" + id);
+
+    if (frame) frame.classList.add("active");
+
+    renderTabs();
+}
+
+function renderTabs() {
+    var root = document.getElementById("tabs");
+    root.innerHTML = "";
+
+    tabs.forEach(function(tab) {
+        var el = document.createElement("div");
+        el.className = "tab" +
+            (tab.id === activeId ? " active" : "");
+
+        var icon = document.createElement("span");
+        icon.className = "tab-icon";
+        icon.textContent = "λ";
+
+        var name = document.createElement("span");
+        name.className = "tab-name";
+        name.textContent = tab.name;
+
+        var close = document.createElement("button");
+        close.className = "close";
+        close.textContent = "×";
+
+        close.onclick = function(e) {
+            e.stopPropagation();
+            closeTab(tab.id);
+        };
+
+        el.onclick = function() {
+            switchTab(tab.id);
+        };
+
+        el.ondblclick = function() {
+            renameTab(tab.id);
+        };
+
+        el.appendChild(icon);
+        el.appendChild(name);
+        el.appendChild(close);
+        root.appendChild(el);
+    });
+
+    var tab = currentTab();
+    document.getElementById("filename").textContent =
+        tab ? tab.name : "No file";
+}
+
+function closeTab(id) {
+    var index = tabs.findIndex(function(tab) {
+        return tab.id === id;
+    });
+
+    if (index < 0) return;
+
+    if (!confirm(
+        "Close " + tabs[index].name +
+        "? Unsaved code may be lost."
+    )) return;
+
+    tabs.splice(index, 1);
+
+    var iframe = document.getElementById("editor-" + id);
+    if (iframe) iframe.remove();
+
+    if (activeId === id) {
+        if (tabs.length) {
+            switchTab(
+                tabs[Math.min(index, tabs.length - 1)].id
+            );
+        } else {
+            activeId = null;
+            createTab("main.lua");
+        }
+    } else {
+        renderTabs();
+    }
+}
+
+function renameTab(id) {
+    var tab = null;
+
+    for (var i = 0; i < tabs.length; i++) {
+        if (tabs[i].id === (id || activeId)) {
+            tab = tabs[i];
+            break;
+        }
+    }
+
+    if (!tab) return;
+
+    var name = prompt("Filename:", tab.name);
+    if (!name || !name.trim()) return;
+
+    tab.name = name.trim();
+    renderTabs();
+}
+
+function executeTab() {
+    alert(
+        "Execute requires a direct integration " +
+        "with GMod Monaco's editor API."
+    );
+}
+
+createTab("main.lua");
+</script>
+
+</body>
+</html>
