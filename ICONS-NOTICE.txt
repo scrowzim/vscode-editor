@@ -1,0 +1,11 @@
+Microsoft Codicons
+Copyright Microsoft Corporation and contributors.
+Project: https://github.com/microsoft/vscode-codicons
+Icons/content: Creative Commons Attribution 4.0 International (CC BY 4.0).
+License: https://creativecommons.org/licenses/by/4.0/
+Upstream notice: https://github.com/microsoft/vscode-codicons/blob/main/LICENSE
+Code: MIT; https://github.com/microsoft/vscode-codicons/blob/main/LICENSE-CODE
+
+This project uses the unchanged Codicons font and glyph mappings distributed
+with monaco-editor 0.55.1. Icons are styled with the editor's theme colors.
+No endorsement by Microsoft is implied.
